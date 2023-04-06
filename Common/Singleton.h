@@ -1,16 +1,18 @@
 #pragma once
 
+namespace utils {
+
 template <typename T>
-class singleton {
+class Singleton {
     private:
         static T* _instance = nullptr;
     protected:
-        singleton() = default;
+        Singleton() = default;
     public:
-        singleton& operator = (const singleton&) const = delete;
-        singleton& operator = (const singleton&&) const = delete;
-        singleton(const singleton&) = delete;
-        singleton(singleton&&) = delete;
+        Singleton& operator = (const Singleton&) const = delete;
+        Singleton& operator = (const Singleton&&) const = delete;
+        Singleton(const Singleton&) = delete;
+        Singleton(Singleton&&) = delete;
     
         static T* instance() {
             if (_instance == nullptr)
@@ -25,3 +27,5 @@ class singleton {
             }
         }
 };
+
+}
