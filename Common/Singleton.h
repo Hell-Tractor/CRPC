@@ -3,16 +3,16 @@
 namespace utils {
 
 template <typename T>
-class Singleton {
+class singleton {
     private:
         static T* _instance = nullptr;
     protected:
-        Singleton() = default;
+        singleton() = default;
     public:
-        Singleton& operator = (const Singleton&) const = delete;
-        Singleton& operator = (const Singleton&&) const = delete;
-        Singleton(const Singleton&) = delete;
-        Singleton(Singleton&&) = delete;
+        singleton& operator = (const singleton&) const = delete;
+        singleton& operator = (const singleton&&) const = delete;
+        singleton(const singleton&) = delete;
+        singleton(singleton&&) = delete;
     
         static T* instance() {
             if (_instance == nullptr)

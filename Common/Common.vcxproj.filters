@@ -15,7 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Singleton.h">
+    <ClInclude Include="singleton.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
