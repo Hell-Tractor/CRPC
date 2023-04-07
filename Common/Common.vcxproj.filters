@@ -18,5 +18,8 @@
     <ClInclude Include="singleton.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="logger.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
