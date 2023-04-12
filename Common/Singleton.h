@@ -32,8 +32,12 @@ class singleton {
 
         static void destroy() {
             if (instance_ != nullptr) {
-                delete instance_;
-                instance_ = nullptr;
+                static std::mutex mutex;
+                std::unique_lock lock(mutex);
+                if (instance_ != nullptr) {
+                    delete instance_;
+                    instance_ = nullptr;
+                }
             }
         }
 };
