@@ -1,5 +1,7 @@
 #pragma once
 
+#include <mutex>
+
 namespace utils {
 
 template <typename T>
@@ -18,8 +20,13 @@ class singleton {
         }
     
         static T* instance() {
-            if (instance_ == nullptr)
-                instance_ = new T();
+            if (instance_ == nullptr) {
+                static std::mutex mutex;
+                std::unique_lock lock(mutex);
+                if (instance_ == nullptr) {
+                    instance_ = new T();
+                }
+            }
             return instance_;
         }
 
