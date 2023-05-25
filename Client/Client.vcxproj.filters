@@ -13,5 +13,22 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="模块">
+      <UniqueIdentifier>{4e07d0e9-e077-4e38-b3bf-5883a93b4dce}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="模块\路由策略">
+      <UniqueIdentifier>{4ee0edc8-3b95-4e4b-a6e0-6f770a1006c3}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="client.ixx">
+      <Filter>模块</Filter>
+    </ClCompile>
+    <ClCompile Include="route_method.ixx">
+      <Filter>模块\路由策略</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
