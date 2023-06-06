@@ -50,54 +50,55 @@ class logger : public singleton<logger> {
             }
             auto now = std::chrono::system_clock::now();
             auto thread_id = std::this_thread::get_id();
-            return std::format("[{:%Y-%m-%d %H:%M:%S}][{}][{}] ", now, level, thread_id);
+            return std::format("[{:%Y-%m-%d %H:%M:%S}][{}][{}] ", now, level, (*reinterpret_cast<uint32_t*>(&thread_id)));
         }
     public:
         
 
-        void add_stream(std::ostream& stream, level level = level::info) {
+        logger& add_stream(std::ostream& stream, level level = level::info) {
             streams_.emplace_back(&stream, level);
+            return *this;
         }
 
         template <level Level, typename... Args>
-        logger* log(const std::string& message, Args&&... args) {
+        constexpr logger& log(const std::string& message, Args&&... args) {
             const std::string formatted_string = this->get_log_prefix<Level>() +
-                std::format(message, std::forward<Args>(args));
+                std::vformat(message, std::make_format_args(std::forward<Args>(args)...));
             for (auto& [stream, level] : streams_) {
                 if (level <= Level)
                     (*stream) << formatted_string << std::endl;
             }
-            return this;
+            return *this;
         }
 
         template <typename... Args>
-        logger* log_trace(const std::string& message, Args&&... args) {
-            return log<level::trace>(message, std::forward<Args>(args));
+        constexpr logger& log_trace(const std::string& message, Args&&... args) {
+            return log<level::trace>(message, std::forward<Args>(args)...);
         }
 
         template <typename... Args>
-        logger* log_debug(const std::string& message, Args&&... args) {
-            return log<level::debug>(message, std::forward<Args>(args));
+        constexpr logger& log_debug(const std::string& message, Args&&... args) {
+            return log<level::debug>(message, std::forward<Args>(args)...);
         }
 
         template <typename... Args>
-        logger* log_info(const std::string& message, Args&&... args) {
-            return log<level::info>(message, std::forward<Args>(args));
+        constexpr logger& log_info(const std::string& message, Args&&... args) {
+          return log<level::info>(message, std::forward<Args>(args)...);
         }
 
         template <typename... Args>
-        logger* log_warn(const std::string& message, Args&&... args) {
-            return log<level::warn>(message, std::forward<Args>(args));
+        constexpr logger& log_warn(const std::string& message, Args&&... args) {
+          return log<level::warn>(message, std::forward<Args>(args)...);
         }
 
         template <typename... Args>
-        logger* log_error(const std::string& message, Args&&... args) {
-            return log<level::error>(message, std::forward<Args>(args));
+        constexpr logger& log_error(const std::string& message, Args&&... args) {
+          return log<level::error>(message, std::forward<Args>(args)...);
         }
 
         template <typename... Args>
-        logger* log_fatal(const std::string& message, Args&&... args) {
-            return log<level::fatal>(message, std::forward<Args>(args));
+        constexpr logger& log_fatal(const std::string& message, Args&&... args) {
+            return log<level::fatal>(message, std::forward<Args>(args)...);
         }
 };
 

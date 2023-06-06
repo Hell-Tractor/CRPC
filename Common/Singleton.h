@@ -6,8 +6,6 @@ namespace utils {
 
 template <typename T>
 class singleton {
-    private:
-        static T* instance_ = nullptr;
     protected:
         singleton() = default;
     public:
@@ -15,30 +13,11 @@ class singleton {
         singleton& operator = (const singleton&&) const = delete;
         singleton(const singleton&) = delete;
         singleton(singleton&&) = delete;
-        ~singleton() {
-            this->destroy();
-        }
+        ~singleton() = default;
     
-        static T* instance() {
-            if (instance_ == nullptr) {
-                static std::mutex mutex;
-                std::unique_lock lock(mutex);
-                if (instance_ == nullptr) {
-                    instance_ = new T();
-                }
-            }
-            return instance_;
-        }
-
-        static void destroy() {
-            if (instance_ != nullptr) {
-                static std::mutex mutex;
-                std::unique_lock lock(mutex);
-                if (instance_ != nullptr) {
-                    delete instance_;
-                    instance_ = nullptr;
-                }
-            }
+        static T& instance() {
+            static T instance;
+            return instance;
         }
 };
 
