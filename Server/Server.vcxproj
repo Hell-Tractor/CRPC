@@ -21,6 +21,9 @@
   <ItemGroup>
     <ClCompile Include="Network\ThreadPool.ixx" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="server.hpp" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
