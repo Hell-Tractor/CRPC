@@ -48,7 +48,7 @@ class logger : public singleton<logger> {
                     level = "FATAL";
                     break;
             }
-            auto now = std::chrono::system_clock::now();
+            std::chrono::zoned_time now{ std::chrono::current_zone(), std::chrono::system_clock::now() };
             auto thread_id = std::this_thread::get_id();
             return std::format("[{:%Y-%m-%d %H:%M:%S}][{}][{}] ", now, level, (*reinterpret_cast<uint32_t*>(&thread_id)));
         }

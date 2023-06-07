@@ -2,12 +2,16 @@
 #include <cereal/types/vector.hpp>
 
 #include "logger.h"
+#include <asio.hpp>
+#include "client.hpp"
 
 int main(int argc, char** argv) {
-  //cereal::JSONOutputArchive archive(std::cout);
-  //std::vector<int> a = { 1, 2, 3 };
-  //archive(CEREAL_NVP(a), CEREAL_NVP(a));
-  LOGGER.add_stream(std::cout);
-  LOGGER.log_info("Hello {}", "cym");
-  return 0;
+    LOGGER.add_stream(std::cout);
+    crpc::client client(asio::ip::tcp::endpoint(asio::ip::make_address("127.0.0.1"), 8080));
+    try {
+        int result = client.call<int>("add", 1, 2);
+    } catch (std::exception& e) {
+        LOGGER.log_error(e.what());
+    }
+    return 0;
 }

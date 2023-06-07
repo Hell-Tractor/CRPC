@@ -24,10 +24,10 @@
     <ClCompile Include="main.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="client.ixx">
+    <ClCompile Include="client.hpp">
       <Filter>模块</Filter>
     </ClCompile>
-    <ClCompile Include="route_method.ixx">
+    <ClCompile Include="route_method.hpp">
       <Filter>模块\路由策略</Filter>
     </ClCompile>
   </ItemGroup>
