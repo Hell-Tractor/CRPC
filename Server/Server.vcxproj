@@ -19,10 +19,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Network\ThreadPool.ixx" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="server.hpp" />
+    <ClCompile Include="server.h" />
+    <ClCompile Include="server_test.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

@@ -49,12 +49,12 @@ class logger : public singleton<logger> {
                     break;
             }
             std::chrono::zoned_time now{ std::chrono::current_zone(), std::chrono::system_clock::now() };
-            auto thread_id = std::this_thread::get_id();
-            return std::format("[{:%Y-%m-%d %H:%M:%S}][{}][{}] ", now, level, (*reinterpret_cast<uint32_t*>(&thread_id)));
+            // auto thread_id = std::this_thread::get_id();
+            // return std::format("[{:%Y-%m-%d %H:%M:%S}][{}][{}] ", now, level, (*reinterpret_cast<uint32_t*>(&thread_id)));
+            return std::format("[{:%Y-%m-%d %H:%M:%S}][{}] ", now, level);
         }
     public:
         
-
         logger& add_stream(std::ostream& stream, level level = level::info) {
             streams_.emplace_back(&stream, level);
             return *this;

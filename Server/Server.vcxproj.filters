@@ -13,22 +13,13 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="模块">
-      <UniqueIdentifier>{20737071-681b-462e-bfc9-10d6679c0441}</UniqueIdentifier>
-      <Extensions>ixx</Extensions>
-    </Filter>
-    <Filter Include="模块\网络">
-      <UniqueIdentifier>{fe20376c-7fb1-4256-a027-da11221f895c}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Network\ThreadPool.ixx">
-      <Filter>模块\网络</Filter>
+    <ClCompile Include="server_test.cpp">
+      <Filter>源文件</Filter>
     </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="server.hpp">
+    <ClCompile Include="server.h">
       <Filter>头文件</Filter>
-    </ClInclude>
+    </ClCompile>
   </ItemGroup>
 </Project>
