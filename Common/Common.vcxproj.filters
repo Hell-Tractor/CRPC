@@ -33,6 +33,12 @@
     <ClInclude Include="protocol.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="thread_safe_queue.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="method.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="common_test.cpp">

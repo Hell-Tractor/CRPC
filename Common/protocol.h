@@ -86,6 +86,26 @@ namespace crpc {
 				}
             }
 
+            template<class callback_t>
+            void async_read_from(asio::ip::tcp::socket& socket, callback_t callback) {
+                asio::async_read(socket, asio::buffer(&_type, sizeof(_type)), [this, &socket, callback](const asio::error_code& ec, std::size_t) {
+                    if (ec) return callback(ec);
+                    asio::async_read(socket, asio::buffer(&_seq_id, sizeof(_seq_id)), [this, &socket, callback](const asio::error_code& ec, std::size_t) {
+                        if (ec) return callback(ec);
+                        asio::async_read(socket, asio::buffer(&_size, sizeof(_size)), [this, &socket, callback](const asio::error_code& ec, std::size_t) {
+                            if (ec) return callback(ec);
+                            if (_size > 0) {
+								_data = new uint8_t[_size];
+                                asio::async_read(socket, asio::buffer(_data, _size), [this, &socket, callback](const asio::error_code& ec, std::size_t) {
+                                    return callback(ec);
+								});
+							}
+                            else return callback(ec);
+						});
+					});
+				}); 
+            }
+
             awaitable<void> await_read_from(asio::ip::tcp::socket& socket) {
 				co_await asio::async_read(socket, asio::buffer(&_type,   sizeof(_type)),   asio::use_awaitable);
 				co_await asio::async_read(socket, asio::buffer(&_seq_id, sizeof(_seq_id)), asio::use_awaitable);
@@ -103,6 +123,25 @@ namespace crpc {
                 if (_size > 0) {
                     asio::write(socket, asio::buffer(_data, _size));
                 }
+            }
+
+            template<class callback_t>
+            void async_write_to(asio::ip::tcp::socket& socket, callback_t callback) {
+                asio::async_write(socket, asio::buffer(&_type, sizeof(_type)), [this, &socket, callback](const asio::error_code& ec, std::size_t) {
+					if (ec) return callback(ec);
+                    asio::async_write(socket, asio::buffer(&_seq_id, sizeof(_seq_id)), [this, &socket, callback](const asio::error_code& ec, std::size_t) {
+						if (ec) return callback(ec);
+                        asio::async_write(socket, asio::buffer(&_size, sizeof(_size)), [this, &socket, callback](const asio::error_code& ec, std::size_t) {
+							if (ec) return callback(ec);
+                            if (_size > 0) {
+                                asio::async_write(socket, asio::buffer(_data, _size), [this, &socket, callback](const asio::error_code& ec, std::size_t) {
+									return callback(ec);
+								});
+							}
+							else return callback(ec);
+						});
+					});
+				}); 
             }
 
             awaitable<void> await_write_to(asio::ip::tcp::socket& socket) const {

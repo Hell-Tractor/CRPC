@@ -6,57 +6,63 @@
 #include <asio/signal_set.hpp>
 #include <asio/write.hpp>
 #include <format>
+#include <memory>
+#include <future>
+#include <queue>
 #include "logger.h"
 #include "protocol.h"
-#include <iostream>
+#include "cereal.h"
 
 namespace crpc {
 
     template<class T> using awaitable = asio::awaitable<T>;
 
-    awaitable<void> client(asio::io_context& io_context, const char* host, const char* port)
-    {
-        LOGGER.log_info("client started");
+    // RPC客户端类型
+    class client final : public std::enable_shared_from_this<client> {
+    private:
 
-        asio::ip::tcp::resolver resolver(io_context);
-        asio::ip::tcp::socket socket(io_context);
+        std::shared_ptr<asio::io_context> _io_context;
+        std::unique_ptr<asio::ip::tcp::resolver> _resolver;
+        std::unique_ptr<asio::ip::tcp::socket> _socket;
+        
+        uint32_t _current_seq_id = 0;
 
-        // 连接
-        co_await socket.async_connect(*co_await resolver.async_resolve(host, port, asio::use_awaitable), asio::use_awaitable);
-        LOGGER.log_info("connected to {}:{}", host, port);
+    public:
+        client(std::shared_ptr<asio::io_context> io_context)
+            : _io_context(io_context)
+            , _resolver(std::make_unique<asio::ip::tcp::resolver>(*_io_context))
+            , _socket(std::make_unique<asio::ip::tcp::socket>(*_io_context)) {}
 
-        uint32_t current_seq_id = 0;
+        client(const client&) = delete;
+        client& operator=(const client&) = delete;
 
-        while (true) {
-            // 发送请求
-            std::string msg; std::cin >> msg;
-            proto::package request(proto::request_type::RPC_METHOD_REQUEST, current_seq_id++, msg);
-            co_await request.await_write_to(socket);
-            LOGGER.log_debug("send package: {}", request.brief_info());
-
-            // 接受响应
-            proto::package response;
-            co_await response.await_read_from(socket);
-            LOGGER.log_debug("recv package: {}", response.brief_info());
-            LOGGER.log_info("response: {}", response.data());
+        // 连接服务器
+        void connect_server(const std::string& host, uint16_t port) {
+            LOGGER.log_info("waiting for connection to {}:{}", host, port);
+            auto endpoints = _resolver->resolve(host, std::to_string(port));
+            _socket->connect(*endpoints.begin());
+            LOGGER.log_info("connected to {}:{}", host, port);
         }
-    }
 
-    void run_client()
-    {
-        try {
-            asio::io_context io_context(1);
+        // 同步rpc请求
+        template<class return_t, class ... args_t>
+        return_t call(const std::string& name, args_t... args) {
+            LOGGER.log_info("call {}", name);
+            auto request_data = cereal::instance().serialize_rpc_request<args_t...>(name, args...);
+            proto::package request(proto::request_type::RPC_METHOD_REQUEST, _current_seq_id++, request_data);
+            request.write_to(*_socket);
+            LOGGER.log_debug("call request package sent: {}", request.brief_info());
 
-            asio::signal_set signals(io_context, SIGINT, SIGTERM);
-            signals.async_wait([&](auto, auto) { io_context.stop(); });
+            proto::package response{};
+            response.read_from(*_socket);
+            LOGGER.log_debug("call response package recv: {}", response.brief_info());
 
-            asio::co_spawn(io_context, client(io_context, "127.0.0.1", "55555"), asio::detached);
-
-            io_context.run();
+            if (response.type() == proto::request_type::RPC_METHOD_RESPONSE && response.seq_id() == request.seq_id()) {
+                return cereal::instance().deserialize_rpc_response<return_t>(response.data());
+            } else {
+                throw std::runtime_error(std::format("call {} failed", name));
+            }
         }
-        catch (std::exception& e) {
-            LOGGER.log_error(e.what());
-        }
-    }
 
+    };
 }

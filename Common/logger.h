@@ -10,6 +10,8 @@
 
 #define LOGGER utils::logger::instance()
 
+// #define LOGGER_PRINT_THREAD_ID
+
 namespace utils {
 
 class logger : public singleton<logger> {
@@ -49,9 +51,12 @@ class logger : public singleton<logger> {
                     break;
             }
             std::chrono::zoned_time now{ std::chrono::current_zone(), std::chrono::system_clock::now() };
-            // auto thread_id = std::this_thread::get_id();
-            // return std::format("[{:%Y-%m-%d %H:%M:%S}][{}][{}] ", now, level, (*reinterpret_cast<uint32_t*>(&thread_id)));
+#ifdef LOGGER_PRINT_THREAD_ID
+            auto thread_id = std::this_thread::get_id();
+            return std::format("[{:%Y-%m-%d %H:%M:%S}][{}][{}] ", now, level, (*reinterpret_cast<uint32_t*>(&thread_id)));
+#else
             return std::format("[{:%Y-%m-%d %H:%M:%S}][{}] ", now, level);
+#endif
         }
     public:
         
