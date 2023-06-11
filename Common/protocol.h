@@ -17,6 +17,16 @@ namespace crpc {
             RPC_RESPONSE,           // 通用响应
             RPC_METHOD_REQUEST,     // 请求方法调用
             RPC_METHOD_RESPONSE,    // 响应方法调用
+
+            REQEUST_TYPE_MAX,
+		};
+
+        const std::string request_type_str[REQEUST_TYPE_MAX] = {
+			"HEARTBEAT_PACKET",
+			"RPC_REQUEST",
+			"RPC_RESPONSE",
+			"RPC_METHOD_REQUEST",
+			"RPC_METHOD_RESPONSE",
 		};
 
 		class package final {
@@ -69,7 +79,7 @@ namespace crpc {
 				return _size;
 			}
 
-            const std::string data() const {
+            std::string data() const {
                 std::string str;
                 str.resize(_size);
                 memcpy(str.data(), _data, _size);
@@ -154,7 +164,7 @@ namespace crpc {
             }
 
             std::string brief_info() const {
-				return std::string("type: ") + std::to_string(_type) + ", seq_id: " + std::to_string(_seq_id) + ", size: " + std::to_string(_size);
+				return std::string("type: ") + request_type_str[_type] + ", seq_id: " + std::to_string(_seq_id) + ", size: " + std::to_string(_size);
 			}
 		};
 
