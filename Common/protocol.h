@@ -1,6 +1,7 @@
 #pragma once
 #include <asio/co_spawn.hpp>
 #include <asio/read.hpp>
+#include <asio/read_until.hpp>
 #include <asio/write.hpp>
 #include <asio/ip/tcp.hpp>
 #include <cstdint>
@@ -12,21 +13,41 @@ namespace crpc {
 
 	namespace proto {
 		enum request_type : std::uint8_t {
-            HEARTBEAT_PACKET,       // 心跳包
             RPC_REQUEST,            // 通用请求
             RPC_RESPONSE,           // 通用响应
+
             RPC_METHOD_REQUEST,     // 请求方法调用
             RPC_METHOD_RESPONSE,    // 响应方法调用
 
-            REQEUST_TYPE_MAX,
+            RPC_SERVER_ONLINE,          // 服务器上线
+            RPC_SERVER_ONLINE_RESPONSE, // 服务器上线响应
+            RPC_CLIENT_ONLINE,          // 客户端上线
+            RPC_CLIENT_ONLINE_RESPONSE, // 客户端上线响应
+
+            HEARTBEAT,              // 心跳
+            HEARTBEAT_RESPONSE,     // 心跳响应
+
+            RPC_SERVICE_UPDATE,         // 服务更新
+
+            REQEUST_TYPE_MAX
 		};
 
         const std::string request_type_str[REQEUST_TYPE_MAX] = {
-			"HEARTBEAT_PACKET",
 			"RPC_REQUEST",
 			"RPC_RESPONSE",
+
 			"RPC_METHOD_REQUEST",
 			"RPC_METHOD_RESPONSE",
+
+            "RPC_SERVER_ONLINE",
+            "RPC_SERVER_ONLINE_RESPONSE",
+            "RPC_CLIENT_ONLINE",
+            "RPC_CLIENT_ONLINE_RESPONSE",
+
+            "HEARTBEAT",
+            "HEARTBEAT_RESPONSE",
+
+            "RPC_SERVICE_UPDATE",
 		};
 
 		class package final {
@@ -87,12 +108,12 @@ namespace crpc {
             }
 
             void read_from(asio::ip::tcp::socket& socket) {
-                asio::read(socket, asio::buffer(&_type,   sizeof(_type)));
-				asio::read(socket, asio::buffer(&_seq_id, sizeof(_seq_id)));
-				asio::read(socket, asio::buffer(&_size,   sizeof(_size)));
+                asio::read(socket, asio::buffer(&_type,   sizeof(_type)),   asio::transfer_exactly(sizeof(_type)));
+                asio::read(socket, asio::buffer(&_seq_id, sizeof(_seq_id)), asio::transfer_exactly(sizeof(_seq_id)));
+                asio::read(socket, asio::buffer(&_size,   sizeof(_size)),   asio::transfer_exactly(sizeof(_size)));
                 if (_size > 0) {
 					_data = new uint8_t[_size];
-					asio::read(socket, asio::buffer(_data, _size));
+                    asio::read(socket, asio::buffer(_data, _size), asio::transfer_exactly(_size));
 				}
             }
 

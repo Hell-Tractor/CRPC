@@ -14,11 +14,13 @@
 #include "crpc_except.h"
 
 namespace crpc {
-    class cereal final : public utils::singleton<cereal> {
+    class serializer final : public utils::singleton<serializer> {
         using input_archive = ::cereal::JSONInputArchive;
         using output_archive = ::cereal::JSONOutputArchive;
 
     public:
+
+        // 序列化普通数据
         template <typename... args_t>
         std::string serialize(args_t... args) {
             std::stringstream ss;
@@ -29,6 +31,7 @@ namespace crpc {
             return ss.str();
         }
 
+        // 反序列化普通数据
         template <typename... args_t>
         std::tuple<args_t...> deserialize(const std::string& data) {
             std::stringstream ss(data);
@@ -38,6 +41,8 @@ namespace crpc {
             return args;
         }
 
+
+        // 序列化rpc请求（方法名、参数）
         template <typename... args_t>
         std::string serialize_rpc_request(std::string method, args_t... args) {
             try {
@@ -53,6 +58,7 @@ namespace crpc {
             }
         }
 
+        // 反序列化rpc请求的方法名
         std::string deserialize_rpc_request_method(const std::string& data) {
             try {
                 std::stringstream ss(data);
@@ -66,6 +72,7 @@ namespace crpc {
             }
         }
 
+        // 反序列化rpc请求的参数
         template <typename... args_t>
         std::tuple<args_t...> deserialize_rpc_request_args(const std::string& data) {
             try {
@@ -80,6 +87,7 @@ namespace crpc {
             }
         }
 
+        // 序列化rpc响应（结果、错误）
         template <typename return_t>
         std::string serialize_rpc_response(return_t result, std::string error) {
             try {
@@ -95,6 +103,7 @@ namespace crpc {
             }
         }
 
+        // 反序列化rpc响应的错误
         std::string deserialize_rpc_response_error(const std::string& data) {
             try {
                 std::stringstream ss(data);
@@ -108,6 +117,7 @@ namespace crpc {
             }
         }
 
+        // 反序列化rpc响应的结果
         template <typename return_t>
         return_t deserialize_rpc_response_result(const std::string& data) {
             try {
@@ -121,5 +131,35 @@ namespace crpc {
                 throw deserialize_error("failed when deserializing result of rpc response");
             }
         }
+
+        // 序列化rpc服务上下线通知的服务列表（vector<pair<服务名，状态>>）
+        std::string serialize_serivce_update(std::vector<std::pair<std::string, bool>> service_list) {
+            try {
+				std::stringstream ss;
+                {
+					output_archive archive(ss);
+					archive(::cereal::make_nvp("service_list", service_list));
+				}
+				return ss.str();
+			}
+            catch (const std::exception& e) {
+				throw serialize_error("failed when serializing rpc service");
+			}
+		}
+
+        // 反序列化rpc服务上下线通知的服务列表
+        std::vector<std::pair<std::string, bool>> deserialize_serivce_update(const std::string& data) {
+            try {
+				std::stringstream ss(data);
+				input_archive archive(ss);
+				std::vector<std::pair<std::string, bool>> service_list;
+				archive(::cereal::make_nvp("service_list", service_list));
+				return service_list;
+			}
+            catch (const std::exception& e) {
+				throw deserialize_error("failed when deserializing service list of rpc service");
+			}
+		}
+
     };
 }

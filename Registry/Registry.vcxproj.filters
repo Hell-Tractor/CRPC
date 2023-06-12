@@ -15,30 +15,12 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="singleton.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="logger.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="message.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="crpc_except.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="serializer.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="protocol.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="method.h">
+    <ClInclude Include="registry.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="common_test.cpp">
+    <ClCompile Include="registry_test.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

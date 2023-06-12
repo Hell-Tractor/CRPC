@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 #include <future>
-#include "cereal.h"
+#include "serializer.h"
 
 namespace crpc {
 
@@ -19,15 +19,15 @@ namespace crpc {
 
         std::string call(const std::string& serialized_data) {
             try {
-                auto args = crpc::cereal::instance().deserialize_rpc_request_args<args_t...>(serialized_data);
+                auto args = crpc::serializer::instance().deserialize_rpc_request_args<args_t...>(serialized_data);
                 return_t ret;
                 std::apply([&](auto&&... unpacked_args) {
                     ret = _func(std::forward<args_t>(unpacked_args)...);
                     }, args);
-                return crpc::cereal::instance().serialize_rpc_response<return_t>(ret, {});
+                return crpc::serializer::instance().serialize_rpc_response<return_t>(ret, {});
             }
             catch (std::exception& e) {
-				return crpc::cereal::instance().serialize_rpc_response<return_t>({}, e.what());
+				return crpc::serializer::instance().serialize_rpc_response<return_t>({}, e.what());
 			}
         }
 
@@ -49,14 +49,14 @@ namespace crpc {
 
         asio::awaitable<std::string> call(const std::string& serialized_data) {
             try {
-                auto args = crpc::cereal::instance().deserialize_rpc_request_args<args_t...>(serialized_data);
+                auto args = crpc::serializer::instance().deserialize_rpc_request_args<args_t...>(serialized_data);
                 return_t ret = co_await std::apply([&](auto&&... unpacked_args) {
                     return _func(std::forward<args_t>(unpacked_args)...);
                 }, args);
-                co_return crpc::cereal::instance().serialize_rpc_response<return_t>(ret, {});
+                co_return crpc::serializer::instance().serialize_rpc_response<return_t>(ret, {});
             }
             catch (std::exception& e) {
-                co_return crpc::cereal::instance().serialize_rpc_response<return_t>({}, e.what());
+                co_return crpc::serializer::instance().serialize_rpc_response<return_t>({}, e.what());
 			}
 		}
     private:
@@ -68,11 +68,11 @@ namespace crpc {
     public:
         return_t get() {
             auto serialized_ret = std::future<std::string>::get();
-            std::string error = crpc::cereal::instance().deserialize_rpc_response_error(serialized_ret);
+            std::string error = crpc::serializer::instance().deserialize_rpc_response_error(serialized_ret);
             if (!error.empty()) {
 				throw std::runtime_error(error);
 			}
-            return crpc::cereal::instance().deserialize_rpc_response_result<return_t>(serialized_ret);
+            return crpc::serializer::instance().deserialize_rpc_response_result<return_t>(serialized_ret);
         }
     };
 

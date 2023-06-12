@@ -6,7 +6,7 @@
 #include <asio/detached.hpp>
 #include <asio/io_context.hpp>
 #include <asio/use_awaitable.hpp>
-#include "cereal.h"
+#include "serializer.h"
 #include "logger.h"
 #include "method.h"
 
@@ -18,7 +18,7 @@ int main() {
 		co_return a + b;
 	});
 
-    auto in_data = crpc::cereal::instance().serialize_rpc_request("", 1, 2);
+    auto in_data = crpc::serializer::instance().serialize_rpc_request("", 1, 2);
 
     asio::co_spawn(io_context, [&]() -> asio::awaitable<void> {
         try {

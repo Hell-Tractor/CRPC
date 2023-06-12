@@ -13,7 +13,7 @@
 #include "logger.h"
 #include "method.h"
 #include "protocol.h"
-#include "cereal.h"
+#include "serializer.h"
 #include "crpc_except.h"
 
 namespace crpc {
@@ -155,7 +155,7 @@ namespace crpc {
             }
             auto seq_id = _current_seq_id++;
             LOGGER.log_info("rpc call #{}: {}", seq_id, name);
-            auto request_data = cereal::instance().serialize_rpc_request<args_t...>(name, args...);
+            auto request_data = serializer::instance().serialize_rpc_request<args_t...>(name, args...);
             proto::package request(proto::request_type::RPC_METHOD_REQUEST, seq_id, request_data);
             _push_send(std::move(request));
 
