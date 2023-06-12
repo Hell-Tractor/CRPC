@@ -27,7 +27,9 @@ namespace crpc {
             HEARTBEAT,              // 心跳
             HEARTBEAT_RESPONSE,     // 心跳响应
 
-            RPC_SERVICE_UPDATE,         // 服务更新
+            RPC_SERVICE_PROVIDE_UPDATE,   // 服务提供更新
+            RPC_SERVICE_SUBSCRIBE_UPDATE, // 服务订阅更新
+            RPC_SERVICE_UPDATE,           // 服务更新
 
             REQEUST_TYPE_MAX
 		};
@@ -47,6 +49,8 @@ namespace crpc {
             "HEARTBEAT",
             "HEARTBEAT_RESPONSE",
 
+            "RPC_SERVICE_PROVIDE_UPDATE",
+            "RPC_SERVICE_SUBSCRIBE_UPDATE",
             "RPC_SERVICE_UPDATE",
 		};
 

@@ -29,15 +29,22 @@ namespace crpc {
             asio::steady_timer heartbeat_timer;
             asio::steady_timer timeout_timer;
             std::unordered_set<std::string> services;
+            std::string addr_str;
             bool closed = false;
         };
         // 与客户端会话维护的信息
         struct client_session {
+            uint32_t id;
             asio::ip::tcp::socket socket;
-            std::string address_str;
             asio::steady_timer timer;
             std::unordered_set<std::string> subscribes;
             std::queue<proto::package> send_queue;
+            bool closed = false;
+
+            void push_send(proto::package pack) {
+                send_queue.push(std::move(pack));
+                timer.cancel_one();
+            }
         };
 
         std::string _host;
@@ -52,12 +59,16 @@ namespace crpc {
         std::chrono::milliseconds _heartbeat_timeout = DEFAULT_SERVER_HEARTBEAT_TIMEOUT;
 
         uint32_t _current_server_id = 0;
+        // 服务端id -> 服务端信息
+        std::unordered_map<uint32_t, std::shared_ptr<server_session>> _servers;
+        // 服务名 -> 提供服务的服务端id列表
+        std::unordered_map<std::string, std::unordered_set<uint32_t>> _service_providers;
 
         uint32_t _current_client_id = 0;
         // 客户端id -> 客户端信息
         std::unordered_map<uint32_t, std::shared_ptr<client_session>> _clients;   
         // 服务名 -> 订阅客户端id列表
-        std::unordered_map<std::string, std::unordered_set<uint32_t>> _service_subscribes;
+        std::unordered_map<std::string, std::unordered_set<uint32_t>> _service_subscribers;
 
         uint32_t _current_seq_id = 0;
 
@@ -94,32 +105,36 @@ namespace crpc {
                 auto server = std::make_shared<server_session>(server_session{
                     _current_server_id++,
                     std::move(socket), 
-                    asio::steady_timer(*_io_context), asio::steady_timer(*_io_context),
+                    asio::steady_timer(*_io_context), 
+                    asio::steady_timer(*_io_context),
+                    {},
                     {}
                 });
-                LOGGER.log_info("{}:{} server#{} online", server->socket.remote_endpoint().address().to_string(), std::to_string(server->socket.remote_endpoint().port()), server->id);
+                server->addr_str = server->socket.remote_endpoint().address().to_string() + ":" + std::to_string(server->socket.remote_endpoint().port());
+                _servers[server->id] = server;
+                LOGGER.log_info("server#{} online of address: {}", server->id, server->addr_str);
 
                 try {
                     // 解析更新服务信息
-                    auto updates = serializer::instance().deserialize_serivce_update(fst_pack.data());
+                    auto updates = serializer::instance().deserialize_provide_update(fst_pack.data());
                     LOGGER.log_debug("recv first service update from server#{}", server->id);
-                    _update_serive(server, std::move(updates));
+                    _update_provide(server, std::move(updates));
                 }
                 catch (const std::exception& e) {
                     LOGGER.log_error("server#{} first service update failed: {}", server->id, e.what());
-                    disconnect_server(server);
+                    _disconnect_server(server);
                     co_return;
                 }
 
                 try {
                     // 发送响应
-                    proto::package online_response(proto::request_type::RPC_SERVER_ONLINE_RESPONSE, _current_seq_id++);
+                    proto::package online_response(proto::request_type::RPC_SERVER_ONLINE_RESPONSE, fst_pack.seq_id());
                     co_await online_response.await_write_to(server->socket);
                     LOGGER.log_debug("online response send to server#{}", server->id);
                 }
                 catch (const std::exception& e) {
                     LOGGER.log_error("server#{} online response failed: {}", server->id, e.what());
-					disconnect_server(server);
+                    _disconnect_server(server);
 					co_return;
                 }
 
@@ -129,22 +144,61 @@ namespace crpc {
             }
             // 客户端上线
             else if (fst_pack.type() == proto::request_type::RPC_CLIENT_ONLINE) {
+                auto client = std::make_shared<client_session>(client_session{
+                    _current_client_id++,
+                    std::move(socket),
+                    asio::steady_timer(*_io_context), 
+                    {}, {}
+                });
+                _clients[client->id] = client;
+                LOGGER.log_info("{}:{} client#{} online", client->socket.remote_endpoint().address().to_string(), std::to_string(client->socket.remote_endpoint().port()), client->id);
 
-                // TODO
+                try {
+                    // 解析服务订阅信息
+                    auto updates = serializer::instance().deserialize_subscribe_update(fst_pack.data());
+                    LOGGER.log_debug("recv first subscribe update from client#{}", client->id);
+                    _update_subscribe(client, std::move(updates));
+                }
+                catch (const std::exception& e) {
+                    LOGGER.log_error("client#{} first subscribe update failed: {}", client->id, e.what());
+                    _disconnect_client(client);
+                    co_return;
+                }
+
+                try {
+                    // 发送响应
+                    proto::package online_response(proto::request_type::RPC_CLIENT_ONLINE_RESPONSE, fst_pack.seq_id());
+                    co_await online_response.await_write_to(client->socket);
+					LOGGER.log_debug("online response send to client#{}", client->id);
+                }
+                catch (const std::exception& e) {
+                    LOGGER.log_error("client#{} online response failed: {}", client->id, e.what());
+                    _disconnect_client(client);
+                }
+
+                // 启动客户端会话
+                asio::co_spawn(*_io_context, [self = shared_from_this(), client] { return self->_client_send(client); }, asio::detached);
+				asio::co_spawn(*_io_context, [self = shared_from_this(), client] { return self->_client_recv(client); }, asio::detached);
+			}
+			else {
+				LOGGER.log_error("connection abandoned: invalid first package type: {}", proto::request_type_str[fst_pack.type()]);
             }
 		}
 
-        // 更新服务
-        void _update_serive(std::shared_ptr<server_session> server, std::vector<std::pair<std::string, bool>>&& update) {
+
+        // 服务端更新提供的服务
+        void _update_provide(std::shared_ptr<server_session> server, std::vector<std::pair<std::string, bool>>&& update) {
             std::vector<std::pair<std::string, bool>> real_update{};
             // 更新服务器服务信息
             for (auto& [name, state] : update) {
                 if (state && !server->services.contains(name)) {
                     server->services.insert(name);
+                    _service_providers[name].insert(server->id);
                     real_update.emplace_back(name, state);
                 }
                 else if (!state && server->services.contains(name)) {
 					server->services.erase(name);
+                    _service_providers[name].erase(server->id);
 					real_update.emplace_back(name, state);
 				}
             }
@@ -152,13 +206,60 @@ namespace crpc {
                 LOGGER.log_info("server#{} service update: {} -> {}", server->id, name, state ? "online" : "offline");
             }
             // 向订阅的客户端的服务推送更新
-            for (auto& [name, state] : real_update) {
-                for (auto& client_id : _service_subscribes[name]) {
-					auto client = _clients[client_id];
-					// TODO 推送更新
-				}
+            std::unordered_map<uint32_t, std::vector<std::pair<std::string, bool>>> client_update{};
+            for (auto& [name, state] : real_update) 
+                for (auto& client_id : _service_subscribers[name]) 
+					client_update[client_id].emplace_back(name, state);
+            for (auto& [id, updates] : client_update) {
+                auto& client = _clients[id];
+                std::vector<std::tuple<std::string, std::string, bool>> update_with_addr{};
+                for(auto& [name, state] : updates)
+					update_with_addr.emplace_back(name, server->addr_str, state);
+                if (update_with_addr.size()) {
+                    _push_service_update(client, std::move(update_with_addr));
+                }
             }
         }
+
+        // 客户端更新订阅的服务
+        void _update_subscribe(std::shared_ptr<client_session> client, std::vector<std::pair<std::string, bool>>&& update) {
+            std::vector<std::pair<std::string, bool>> real_update{};
+            // 更新客户端订阅信息
+            for (auto& [name, state] : update) {
+                if (state && !client->subscribes.contains(name)) {
+                    client->subscribes.insert(name);
+                    _service_subscribers[name].insert(client->id);
+                    real_update.emplace_back(name, state);
+                }
+                else if (!state && client->subscribes.contains(name)) {
+                    client->subscribes.erase(name);
+                    _service_subscribers[name].erase(client->id);
+                    real_update.emplace_back(name, state);
+                }
+            }
+            for (auto& [name, state] : real_update) {
+                LOGGER.log_info("client#{} subscribe update: {} -> {}", client->id, name, state ? "sub" : "unsub");
+            }
+            // 如果有新增订阅，向客户端推送相关更新
+            std::vector<std::tuple<std::string, std::string, bool>> update_with_addr{};
+            for(auto& [name, state] : real_update) if (state) { 
+                for (auto& id : _service_providers[name]) {
+                    auto& server = _servers[id];
+                    update_with_addr.emplace_back(name, server->addr_str, true);
+                }
+		    }
+            if (update_with_addr.size()) {
+				_push_service_update(client, std::move(update_with_addr));
+			}
+        }
+
+        // 推送服务更新到客户端
+        void _push_service_update(std::shared_ptr<client_session> client, std::vector<std::tuple<std::string, std::string, bool>>&& update) {
+            auto data = serializer::instance().serialize_service_update(update);
+            proto::package pack(proto::request_type::RPC_SERVICE_UPDATE, _current_seq_id++, std::move(data));
+            client->push_send(std::move(pack));
+		}
+
 
         // 服务端发送协程
         asio::awaitable<void> _server_send(std::shared_ptr<server_session> server) {
@@ -185,7 +286,7 @@ namespace crpc {
             }
             catch (const std::exception& e) {
                 LOGGER.log_error("server#{} send failed: {}", server->id, e.what());
-                disconnect_server(server);
+                _disconnect_server(server);
             }
 
             LOGGER.log_debug("server#{} send end", server->id);
@@ -199,11 +300,11 @@ namespace crpc {
                 while (server->socket.is_open()) {
                     proto::package pack;
                     co_await pack.await_read_from(server->socket);
-                    if (pack.type() == proto::request_type::RPC_SERVICE_UPDATE) {    
+                    if (pack.type() == proto::request_type::RPC_SERVICE_PROVIDE_UPDATE) {    
                         // 服务更新
                         LOGGER.log_info("recv service update from server#{}", server->id);
-                        auto updates = serializer::instance().deserialize_serivce_update(pack.data());
-                        _update_serive(server, std::move(updates));
+                        auto updates = serializer::instance().deserialize_provide_update(pack.data());
+                        _update_provide(server, std::move(updates));
                     }
                     else if (pack.type() == proto::request_type::HEARTBEAT_RESPONSE) {   
                         // 心跳响应
@@ -214,14 +315,14 @@ namespace crpc {
             }
             catch (const std::exception& e) {
                 LOGGER.log_error("server#{} send failed: {}", server->id, e.what());
-                disconnect_server(server);
+                _disconnect_server(server);
             }
 
             LOGGER.log_debug("server#{} recv end", server->id);
         }
 
         // 从服务端断开
-        void disconnect_server(std::shared_ptr<server_session> server) {
+        void _disconnect_server(std::shared_ptr<server_session> server) {
             if (server->closed) return;
 		    LOGGER.log_info("disconnect server#{}", server->id);
             server->closed = true;
@@ -232,8 +333,76 @@ namespace crpc {
             std::vector<std::pair<std::string, bool>> update{};
             for (auto& name : server->services) 
 				update.emplace_back(name, false);
-            _update_serive(server, std::move(update));
+            _update_provide(server, std::move(update));
+            _servers.erase(server->id);
 		}
+
+
+        // 客户端发送协程
+        asio::awaitable<void> _client_send(std::shared_ptr<client_session> client) {
+            LOGGER.log_debug("client#{} send start", client->id);
+
+            client->timer.expires_at(std::chrono::steady_clock::time_point::max());
+            try {
+                while (client->socket.is_open()) {
+                    if (client->send_queue.empty()) {
+                        asio::error_code ec;
+                        co_await client->timer.async_wait(asio::redirect_error(asio::use_awaitable, ec));
+                    }
+					else {
+						auto& pack = client->send_queue.front();
+						co_await pack.await_write_to(client->socket);
+                        LOGGER.log_debug("send package to client#{}: {}", client->id, pack.brief_info());
+						client->send_queue.pop();
+					}
+                }
+            }
+            catch (const std::exception& e) {
+				LOGGER.log_error("client#{} send failed: {}", client->id, e.what());
+				_disconnect_client(client);
+			}
+
+	        LOGGER.log_debug("client#{} send end", client->id);
+        }
+
+        // 客户端接收协程
+        asio::awaitable<void> _client_recv(std::shared_ptr<client_session> client) {
+            LOGGER.log_debug("client#{} recv start", client->id);
+
+            try {
+                while (client->socket.is_open()) {
+                    proto::package pack;
+			        co_await pack.await_read_from(client->socket);
+
+                    if (pack.type() == proto::request_type::RPC_SERVICE_SUBSCRIBE_UPDATE) {
+                        // 订阅更新
+                        LOGGER.log_info("recv subscribe update from client#{}", client->id);
+                        auto updates = serializer::instance().deserialize_subscribe_update(pack.data());
+                        _update_subscribe(client, std::move(updates));
+                    }
+                }
+            }
+            catch (const std::exception& e) {
+                LOGGER.log_error("client#{} recv failed: {}", client->id, e.what());
+				_disconnect_client(client);
+			}
+
+	        LOGGER.log_debug("client#{} recv end", client->id);
+		}
+
+        // 从客户端断开
+        void _disconnect_client(std::shared_ptr<client_session> client) {
+            if (client->closed) return;
+            LOGGER.log_info("disconnect client#{}", client->id);
+            client->closed = true;
+            client->timer.cancel();
+            client->socket.close();
+            // 删除所有订阅
+            for (auto& name : client->subscribes) 
+				_service_subscribers[name].erase(client->id);
+            _clients.erase(client->id);
+        }
+
 
     public:
         registry() {}
@@ -264,7 +433,7 @@ namespace crpc {
             _current_client_id = 0;
             _current_seq_id = 0;
             _clients.clear();
-            _service_subscribes.clear();
+            _service_subscribers.clear();
         }
 
         // 停止注册中心

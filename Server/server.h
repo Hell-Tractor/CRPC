@@ -208,7 +208,7 @@ namespace crpc {
             }
             catch (std::exception& e) {
                 LOGGER.log_error("exception in registry send: {}", e.what());
-                disconnect_registry(session);
+                _disconnect_registry(session);
             }
 
             LOGGER.log_info("registry session recv closed");
@@ -235,14 +235,14 @@ namespace crpc {
             }
             catch (std::exception& e) {
                 LOGGER.log_error("exception in registry send: {}", e.what());
-                disconnect_registry(session);
+                _disconnect_registry(session);
             }
 
             LOGGER.log_info("registry session send closed");
         }
 
         // 关闭注册中心连接
-        void disconnect_registry(std::shared_ptr<registry_session> session) {
+        void _disconnect_registry(std::shared_ptr<registry_session> session) {
 			if (session->closed) return;
 			LOGGER.log_info("disconnect registry");
 			session->socket.close();
@@ -273,8 +273,8 @@ namespace crpc {
 			return _io_context;
 		}
 
-        // 是否在更新服务时自动推送服务到注册中心
-        void auto_push_service(bool flag) {
+        // 设置是否在更新服务时自动推送服务到注册中心
+        void set_auto_push_service(bool flag) {
 			_auto_push_service = flag;
 		}
 
@@ -298,7 +298,7 @@ namespace crpc {
                 // 发送初始化包
                 std::vector<std::pair<std::string, bool>> updates{};
                 for (auto& name : _current_available_services) updates.push_back(std::make_pair(name, true));
-                auto data = serializer::instance().serialize_serivce_update(updates);
+                auto data = serializer::instance().serialize_provide_update(updates);
                 proto::package pack(proto::request_type::RPC_SERVER_ONLINE, _current_seq_id++, data);
                 pack.write_to(session->socket);
                 LOGGER.log_debug("online request send to registry");
@@ -333,6 +333,7 @@ namespace crpc {
 
         // 停止服务端
         void stop() {
+            if(_registry_session) _disconnect_registry(_registry_session);
 			_acceptor->close();
 			_work_guard.reset();
 			_io_context.stop();
@@ -342,7 +343,7 @@ namespace crpc {
         // 注册一个服务
         template<class return_t, class... args_t>
         std::shared_ptr<server> register_service(const std::string& name, std::function<return_t(args_t...)> method) {
-            unregister_method(name);
+            unregister_service(name);
             _methods[name] = std::make_unique<method_t<return_t, args_t...>>(method);
             _current_available_services.insert(name);
             LOGGER.log_info("method {} registered", name);
@@ -353,7 +354,7 @@ namespace crpc {
         // 注册一个协程服务
         template<class return_t, class... args_t>
         std::shared_ptr<server> register_service(const std::string& name, std::function<asio::awaitable<return_t>(args_t...)> method) {
-            unregister_method(name);
+            unregister_service(name);
             _awaitable_methods[name] = std::make_unique<awaitable_method_t<return_t, args_t...>>(method);
             _current_available_services.insert(name);
             LOGGER.log_info("awaitable method {} registered", name);
@@ -361,8 +362,8 @@ namespace crpc {
             return shared_from_this();
         }
 
-        // 删除一个方法
-        std::shared_ptr<server> unregister_method(const std::string& name) {
+        // 删除一个服务
+        std::shared_ptr<server> unregister_service(const std::string& name) {
             if (_methods.contains(name)) {
                 _methods.erase(name);
                 _current_available_services.erase(name);
@@ -396,9 +397,9 @@ namespace crpc {
                     updates.emplace_back(name, false);
                     ++del_count;
                 }
-            auto data = serializer::instance().serialize_serivce_update(updates);
+            auto data = serializer::instance().serialize_provide_update(updates);
 
-            proto::package pack(proto::request_type::RPC_SERVICE_UPDATE, _current_seq_id++, data);
+            proto::package pack(proto::request_type::RPC_SERVICE_PROVIDE_UPDATE, _current_seq_id++, data);
             _registry_session->send_queue.push(std::move(pack));
            
             _last_available_services = _current_available_services;

@@ -23,7 +23,8 @@ namespace crpc {
     // RPC客户端类型
     class client final : public std::enable_shared_from_this<client> {
     private:
-        asio::io_context _io_context;
+        std::shared_ptr<asio::io_context> _io_context;
+        bool _use_self_io_context;   // 是否使用自身的io_context
         asio::executor_work_guard<asio::io_context::executor_type> _work_guard;
         std::unique_ptr<std::jthread> _io_thread;
 
@@ -43,7 +44,7 @@ namespace crpc {
         uint32_t _current_seq_id = 0;
 
         // RPC调用超时时间
-        std::chrono::milliseconds _rpc_call_timeout;
+        std::chrono::milliseconds _rpc_call_timeout = DEFAULT_RPC_CALL_TIMEOUT;
 
         // 发送协程
         asio::awaitable<void> _handle_send() {
@@ -111,25 +112,42 @@ namespace crpc {
         }
 
     public:
-        client(std::chrono::milliseconds rpc_call_timeout = DEFAULT_RPC_CALL_TIMEOUT) :
-            _io_context(1),
-            _work_guard(asio::make_work_guard(_io_context)),
-            _resolver(_io_context),
-            _socket(_io_context),
-            _timer(_io_context),
-            _rpc_call_timeout(rpc_call_timeout) {
+        client() :
+            _io_context(std::make_shared<asio::io_context>(1)),
+            _use_self_io_context(true),
+            _work_guard(asio::make_work_guard(get_io_context())),
+            _resolver(get_io_context()),
+            _socket(get_io_context()),
+            _timer(get_io_context()) {
 
             _timer.expires_at(std::chrono::steady_clock::time_point::max());
             _io_thread = std::make_unique<std::jthread>([this] { 
                 LOGGER.log_debug("client io thread started");
-                _io_context.run(); 
+                get_io_context().run();
                 LOGGER.log_debug("client io thread stopped");
             });
         }
 
+        client(std::shared_ptr<asio::io_context> io_context) :
+			_io_context(io_context),
+            _use_self_io_context(false),
+			_work_guard(asio::make_work_guard(get_io_context())),
+			_resolver(get_io_context()),
+			_socket(get_io_context()),
+			_timer(get_io_context()) {
+
+			_timer.expires_at(std::chrono::steady_clock::time_point::max());
+		}
+
         ~client() {
-			_io_context.stop();
-			_io_thread->join();
+            if(_use_self_io_context) {
+                _io_context->stop();
+                _io_thread->join();
+			}
+		}
+
+        asio::io_context& get_io_context() {
+			return *_io_context;
 		}
 
         client(const client&) = delete;
@@ -143,8 +161,8 @@ namespace crpc {
             LOGGER.log_info("connected to {}:{}", host, port);
 
             auto self = shared_from_this();
-            asio::co_spawn(_io_context, [self] { return self->_handle_send(); }, asio::detached);
-            asio::co_spawn(_io_context, [self] { return self->_handle_recv(); }, asio::detached);
+            asio::co_spawn(get_io_context(), [self] { return self->_handle_send(); }, asio::detached);
+            asio::co_spawn(get_io_context(), [self] { return self->_handle_recv(); }, asio::detached);
         }
 
         // 异步rpc请求
@@ -161,12 +179,12 @@ namespace crpc {
 
             _request_status[seq_id] = request_status{
                 std::promise<std::string>{},
-                std::make_unique<asio::steady_timer>(_io_context, _rpc_call_timeout),
+                std::make_unique<asio::steady_timer>(get_io_context(), _rpc_call_timeout),
                 false
             };
 
             // 处理超时
-            asio::co_spawn(_io_context, [seq_id, self = shared_from_this()]() -> asio::awaitable<void> {
+            asio::co_spawn(get_io_context(), [seq_id, self = shared_from_this()]() -> asio::awaitable<void> {
                 auto& [promise, timer, done] = self->_request_status[seq_id];
                 asio::error_code ec;
                 co_await timer->async_wait(asio::redirect_error(asio::use_awaitable, ec));

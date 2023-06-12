@@ -23,5 +23,8 @@
     <ClInclude Include="client.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="connection_pool.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

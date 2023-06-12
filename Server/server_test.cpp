@@ -50,7 +50,7 @@ int main() {
 
 		server->push_service_update();
 
-		server->unregister_method("mul")->unregister_method("size")->register_service<int, std::string>("size", get_size{})->push_service_update();
+		server->unregister_service("mul")->unregister_service("size")->register_service<int, std::string>("size", get_size{})->push_service_update();
 		server->register_service<int, int, int>("mul", mul)->push_service_update();
 
 		server->start("127.0.0.1", 55555);

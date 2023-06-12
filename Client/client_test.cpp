@@ -1,8 +1,22 @@
+#include "connection_pool.h"
 #include "client.h"
 #include <iostream>
 #include <fstream>
 
-int main() {
+void connection_pool_test() {
+	LOGGER.add_stream(std::cout, utils::logger::level::debug);
+
+	auto con = std::make_shared<crpc::connection_pool>();
+	con->connect_registry("127.0.0.1", 55554);
+
+	con->subscribe_service("add")->subscribe_service("mul")->subscribe_service("size")->push_subscribe_update();
+
+	con->unsubscribe_service("add")->subscribe_service("add")->unsubscribe_service("mul")->push_subscribe_update();
+
+	con->subscribe_service("mul")->push_subscribe_update();
+}
+
+void client_test() {
 	LOGGER.add_stream(std::cout, utils::logger::level::debug);
 
 	auto client = std::make_shared<crpc::client>();
@@ -35,6 +49,15 @@ int main() {
 	catch (const std::exception& e) {
 		LOGGER.log_error("exception: {}", e.what());
 	}
+}
 
+int main() {
+	try {
+		connection_pool_test();
+		// client_test();
+	}
+	catch (const std::exception& e) {
+		LOGGER.log_error("main exception: {}", e.what());
+	}
 	std::cin.get();
 }

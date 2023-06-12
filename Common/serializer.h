@@ -132,8 +132,8 @@ namespace crpc {
             }
         }
 
-        // 序列化rpc服务上下线通知的服务列表（vector<pair<服务名，状态>>）
-        std::string serialize_serivce_update(std::vector<std::pair<std::string, bool>> service_list) {
+        // 序列化rpc服务提供更新（vector<pair<服务名，状态>>）
+        std::string serialize_provide_update(std::vector<std::pair<std::string, bool>> service_list) {
             try {
 				std::stringstream ss;
                 {
@@ -143,12 +143,12 @@ namespace crpc {
 				return ss.str();
 			}
             catch (const std::exception& e) {
-				throw serialize_error("failed when serializing rpc service");
+				throw serialize_error("failed when serializing provide update");
 			}
 		}
 
-        // 反序列化rpc服务上下线通知的服务列表
-        std::vector<std::pair<std::string, bool>> deserialize_serivce_update(const std::string& data) {
+        // 反序列化rpc服务提供更新
+        std::vector<std::pair<std::string, bool>> deserialize_provide_update(const std::string& data) {
             try {
 				std::stringstream ss(data);
 				input_archive archive(ss);
@@ -157,7 +157,65 @@ namespace crpc {
 				return service_list;
 			}
             catch (const std::exception& e) {
-				throw deserialize_error("failed when deserializing service list of rpc service");
+				throw deserialize_error("failed when deserializing provide update");
+			}
+		}
+
+        // 序列化rpc服务订阅更新（vector<pair<服务名，状态>>）
+        std::string serialize_subscribe_update(std::vector<std::pair<std::string, bool>> subscribe_list) {
+            try {
+                std::stringstream ss;
+                {
+                    output_archive archive(ss);
+                    archive(::cereal::make_nvp("subscribe_list", subscribe_list));
+                }
+                return ss.str();
+            }
+            catch (const std::exception& e) {
+                throw serialize_error("failed when serializing subscribe update");
+            }
+        }
+
+        // 反序列化rpc服务订阅更新
+        std::vector<std::pair<std::string, bool>> deserialize_subscribe_update(const std::string& data) {
+            try {
+                std::stringstream ss(data);
+                input_archive archive(ss);
+                std::vector<std::pair<std::string, bool>> subscribe_list;
+                archive(::cereal::make_nvp("subscribe_list", subscribe_list));
+                return subscribe_list;
+            }
+            catch (const std::exception& e) {
+                throw deserialize_error("failed when deserializing subscribe update");
+            }
+        }
+
+        // 序列化rpc服务更新（vector<tuple<服务名，地址，状态>>）
+        std::string serialize_service_update(std::vector<std::tuple<std::string, std::string, bool>> subscribe_list) {
+            try {
+                std::stringstream ss;
+                {
+                    output_archive archive(ss);
+                    archive(::cereal::make_nvp("service_list", subscribe_list));
+                }
+                return ss.str();
+            }
+            catch (const std::exception& e) {
+                throw serialize_error("failed when serializing rpc service update");
+            }
+        }
+
+        // 反序列化rpc服务更新
+        std::vector<std::tuple<std::string, std::string, bool>> deserialize_service_update(const std::string& data) {
+			try {
+				std::stringstream ss(data);
+				input_archive archive(ss);
+				std::vector<std::tuple<std::string, std::string, bool>> service_list;
+				archive(::cereal::make_nvp("service_list", service_list));
+				return service_list;
+			}
+			catch (const std::exception& e) {
+				throw deserialize_error("failed when deserializing rpc service update");
 			}
 		}
 
