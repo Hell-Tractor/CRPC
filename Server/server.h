@@ -337,9 +337,9 @@ namespace crpc {
 
         // Í£Ö¹·þÎñ¶Ë
         void stop() {
-            if(_registry_session) _disconnect_registry(_registry_session);
-			_acceptor->close();
-			_work_guard.reset();
+            if (_registry_session) _disconnect_registry(_registry_session);
+			if (_acceptor) _acceptor->close();
+             _work_guard.reset();
 			_io_context.stop();
 			_io_thread.join();
 		}
