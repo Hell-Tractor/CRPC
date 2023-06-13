@@ -67,6 +67,7 @@ class logger : public singleton<logger> {
 
         template <level Level, typename... Args>
         constexpr logger& log(const std::string& message, Args&&... args) {
+            if (streams_.empty()) return *this;
             const std::string formatted_string = this->get_log_prefix<Level>() +
                 std::vformat(message, std::make_format_args(std::forward<Args>(args)...));
             for (auto& [stream, level] : streams_) {
