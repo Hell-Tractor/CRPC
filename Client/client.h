@@ -94,8 +94,9 @@ namespace crpc {
             }
             catch (const std::exception& e) {
 				LOGGER.log_error("send coroutine error: {}", e.what());
-                disconnet();
 			}
+
+            disconnet();
             LOGGER.log_info("send coroutine stopped");
 		}
 
@@ -114,8 +115,9 @@ namespace crpc {
             }
             catch (const std::exception& e) {
                 LOGGER.log_error("recv coroutine error: {}", e.what());
-                disconnet();
             }
+
+            disconnet();
             LOGGER.log_info("recv coroutine stopped");
         }
 

@@ -132,9 +132,9 @@ namespace crpc {
             }
             catch (std::exception& e) {
                 LOGGER.log_error("exception in registry send: {}", e.what());
-                _disconnect_registry(session);
             }
 
+            _disconnect_registry(session);
             LOGGER.log_info("registry session recv closed");
         }
 
@@ -159,9 +159,9 @@ namespace crpc {
             }
             catch (std::exception& e) {
                 LOGGER.log_error("exception in registry send: {}", e.what());
-                _disconnect_registry(session);
             }
 
+            _disconnect_registry(session);
             LOGGER.log_info("registry session send closed");
         }
 

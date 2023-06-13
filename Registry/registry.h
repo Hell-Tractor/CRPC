@@ -298,9 +298,9 @@ namespace crpc {
             }
             catch (const std::exception& e) {
                 LOGGER.log_error("server#{} send failed: {}", server->id, e.what());
-                _disconnect_server(server);
             }
 
+            _disconnect_server(server);
             LOGGER.log_debug("server#{} send end", server->id);
 		}
 
@@ -327,9 +327,9 @@ namespace crpc {
             }
             catch (const std::exception& e) {
                 LOGGER.log_error("server#{} send failed: {}", server->id, e.what());
-                _disconnect_server(server);
             }
 
+            _disconnect_server(server);
             LOGGER.log_debug("server#{} recv end", server->id);
         }
 
@@ -371,9 +371,9 @@ namespace crpc {
             }
             catch (const std::exception& e) {
 				LOGGER.log_error("client#{} send failed: {}", client->id, e.what());
-				_disconnect_client(client);
 			}
 
+            _disconnect_client(client);
 	        LOGGER.log_debug("client#{} send end", client->id);
         }
 
@@ -396,9 +396,9 @@ namespace crpc {
             }
             catch (const std::exception& e) {
                 LOGGER.log_error("client#{} recv failed: {}", client->id, e.what());
-				_disconnect_client(client);
 			}
 
+            _disconnect_client(client);
 	        LOGGER.log_debug("client#{} recv end", client->id);
 		}
 

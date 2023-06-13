@@ -151,9 +151,9 @@ namespace crpc {
             }
             catch (std::exception& e) {
                 LOGGER.log_error("<{}> exception in client session recv: {}", addr_str, e.what());
-                disconnect_client(session);
             }
 
+            disconnect_client(session);
             LOGGER.log_info("<{}> client session recv closed", addr_str);
         }
 
@@ -180,9 +180,9 @@ namespace crpc {
             }
             catch (std::exception& e) {
                 LOGGER.log_error("<{}> exception in client session send: {}", addr_str, e.what());
-                disconnect_client(session);
             }
 
+            disconnect_client(session);
             LOGGER.log_info("<{}> client session send closed", addr_str);
         }
 
@@ -217,9 +217,9 @@ namespace crpc {
             }
             catch (std::exception& e) {
                 LOGGER.log_error("exception in registry send: {}", e.what());
-                _disconnect_registry(session);
             }
 
+            _disconnect_registry(session);
             LOGGER.log_info("registry session recv closed");
         }
 
@@ -244,9 +244,9 @@ namespace crpc {
             }
             catch (std::exception& e) {
                 LOGGER.log_error("exception in registry send: {}", e.what());
-                _disconnect_registry(session);
             }
 
+            _disconnect_registry(session);
             LOGGER.log_info("registry session send closed");
         }
 
