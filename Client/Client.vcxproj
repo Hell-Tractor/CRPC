@@ -24,6 +24,7 @@
   <ItemGroup>
     <ClInclude Include="client.h" />
     <ClInclude Include="connection_pool.h" />
+    <ClInclude Include="route.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

@@ -254,8 +254,8 @@ namespace crpc {
 		}
 
     public:
-        server() 
-            : _io_context(1), _work_guard(asio::make_work_guard(_io_context.get_executor())) {
+        server(const std::string& host, uint16_t port) 
+            : _host(host), _port(port), _io_context(1), _work_guard(asio::make_work_guard(_io_context.get_executor())) {
             _io_thread = std::jthread([&io_context = this->_io_context] {
                 LOGGER.log_debug("server io thread started");
                 io_context.run();
@@ -298,7 +298,8 @@ namespace crpc {
                 // 发送初始化包
                 std::vector<std::pair<std::string, bool>> updates{};
                 for (auto& name : _current_available_services) updates.push_back(std::make_pair(name, true));
-                auto data = serializer::instance().serialize_provide_update(updates);
+                auto addr_str = host + ":" + std::to_string(_port);
+                auto data = serializer::instance().serialize_server_online(updates, addr_str);
                 proto::package pack(proto::request_type::RPC_SERVER_ONLINE, _current_seq_id++, data);
                 pack.write_to(session->socket);
                 LOGGER.log_debug("online request send to registry");
@@ -323,11 +324,9 @@ namespace crpc {
             }
         }
 
-        // 在指定端口上启动服务端
-        void start(const std::string& host, uint16_t port) {
-            _host = host;
-            _port = port;
-            _acceptor = std::make_unique<asio::ip::tcp::acceptor>(_io_context, asio::ip::tcp::endpoint(asio::ip::make_address(host), port));
+        // 启动服务端
+        void start() {
+            _acceptor = std::make_unique<asio::ip::tcp::acceptor>(_io_context, asio::ip::tcp::endpoint(asio::ip::make_address(_host), _port));
             asio::co_spawn(_io_context, [self = shared_from_this()] { return self->_listener(); }, asio::detached);
         }
 

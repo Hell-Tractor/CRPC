@@ -28,4 +28,16 @@ namespace crpc {
         explicit timeout_error(const char* message) : runtime_error(message) {}
     };
 
+    class service_not_available_error final : public std::runtime_error {
+    public:
+        explicit service_not_available_error(const std::string& message) : runtime_error(message) {}
+        explicit service_not_available_error(const char* message) : runtime_error(message) {}
+    };
+
+    class route_error final : public std::runtime_error {
+    public:
+		explicit route_error(const std::string& message) : runtime_error(message) {}
+		explicit route_error(const char* message) : runtime_error(message) {}
+	};
+
 }

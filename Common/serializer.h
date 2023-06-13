@@ -132,6 +132,49 @@ namespace crpc {
             }
         }
 
+        // 序列化服务器上线（vector<pair<服务名，状态>>, 地址）
+        std::string serialize_server_online(std::vector<std::pair<std::string, bool>> service_list, std::string addr) {
+            try {
+                std::stringstream ss;
+                {
+                    output_archive archive(ss);
+                    archive(::cereal::make_nvp("service_list", service_list), ::cereal::make_nvp("addr", addr));
+                }
+                return ss.str();
+            }
+            catch (const std::exception& e) {
+                throw serialize_error("failed when serializing server online info");
+            }
+        }
+
+        // 反序列化服务器上线的服务列表
+        std::vector<std::pair<std::string, bool>> deserialize_server_online_service_list(const std::string& data) {
+			try {
+				std::stringstream ss(data);
+				input_archive archive(ss);
+				std::vector<std::pair<std::string, bool>> service_list;
+				archive(::cereal::make_nvp("service_list", service_list));
+				return service_list;
+			}
+			catch (const std::exception& e) {
+				throw deserialize_error("failed when deserializing service list of server online info");
+			}
+		}
+
+        // 反序列化服务器上线的地址
+        std::string deserialize_server_online_addr(const std::string& data) {
+			try {
+				std::stringstream ss(data);
+				input_archive archive(ss);
+				std::string addr;
+				archive(::cereal::make_nvp("addr", addr));
+				return addr;
+			}
+			catch (const std::exception& e) {
+				throw deserialize_error("failed when deserializing addr of server online info");
+			}
+		}
+
         // 序列化rpc服务提供更新（vector<pair<服务名，状态>>）
         std::string serialize_provide_update(std::vector<std::pair<std::string, bool>> service_list) {
             try {

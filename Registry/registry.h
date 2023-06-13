@@ -110,15 +110,16 @@ namespace crpc {
                     {},
                     {}
                 });
-                server->addr_str = server->socket.remote_endpoint().address().to_string() + ":" + std::to_string(server->socket.remote_endpoint().port());
                 _servers[server->id] = server;
-                LOGGER.log_info("server#{} online of address: {}", server->id, server->addr_str);
+                LOGGER.log_info("server#{} online", server->id);
 
                 try {
                     // 解析更新服务信息
-                    auto updates = serializer::instance().deserialize_provide_update(fst_pack.data());
-                    LOGGER.log_debug("recv first service update from server#{}", server->id);
+                    auto updates = serializer::instance().deserialize_server_online_service_list(fst_pack.data());
+                    auto addr = serializer::instance().deserialize_server_online_addr(fst_pack.data());
+                    _servers[server->id]->addr_str = addr;
                     _update_provide(server, std::move(updates));
+                    LOGGER.log_debug("recv first service update from server#{}", server->id);
                 }
                 catch (const std::exception& e) {
                     LOGGER.log_error("server#{} first service update failed: {}", server->id, e.what());
@@ -167,7 +168,15 @@ namespace crpc {
 
                 try {
                     // 发送响应
-                    proto::package online_response(proto::request_type::RPC_CLIENT_ONLINE_RESPONSE, fst_pack.seq_id());
+                    std::vector<std::tuple<std::string, std::string, bool>> services{};
+                    for(auto& name : client->subscribes) 
+                        if(_service_providers.contains(name)) 
+                            for (auto& id : _service_providers[name]) {
+                                auto addr = _servers[id]->addr_str;
+                                services.emplace_back(std::make_tuple(name, addr, true));
+                            }
+                    auto data = serializer::instance().serialize_service_update(std::move(services));
+                    proto::package online_response(proto::request_type::RPC_CLIENT_ONLINE_RESPONSE, fst_pack.seq_id(), data);
                     co_await online_response.await_write_to(client->socket);
 					LOGGER.log_debug("online response send to client#{}", client->id);
                 }

@@ -10,12 +10,14 @@
 #include <memory>
 #include <future>
 #include <queue>
+#include <set>
 #include "logger.h"
 #include "method.h"
 #include "protocol.h"
 #include "serializer.h"
 #include "crpc_except.h"
 #include "client.h"
+#include "route.h"
 
 namespace crpc {
 
@@ -37,7 +39,23 @@ namespace crpc {
             }
         };
 
-        asio::io_context _io_context;
+        struct connection {
+            std::shared_ptr<client> client;
+            int64_t last_use_time;
+            std::string addr;
+            // 更新时间
+            void update() {
+                last_use_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+            }
+        };
+
+        struct lru_comparer {
+		    bool operator()(const std::shared_ptr<connection>& a, const std::shared_ptr<connection>& b) const {
+				return a->last_use_time < b->last_use_time;
+			}
+		};
+
+        std::shared_ptr<asio::io_context> _io_context;
         asio::executor_work_guard<asio::io_context::executor_type> _work_guard;
         std::jthread _io_thread;
 
@@ -51,6 +69,13 @@ namespace crpc {
         uint32_t _current_seq_id = 0;
 
         bool _auto_push_subscribe = DEFAULT_CLIENT_AUTO_PUSH_SUBSCRIBE;
+
+        std::unordered_map<std::string, std::shared_ptr<connection>> _pool;
+        std::set<std::shared_ptr<connection>, lru_comparer> _lru_queue;
+
+        std::shared_ptr<route::strategy> _route_strategy;
+        std::string _local_address;
+        size_t _pool_size;
 
         // 服务名 -> 服务地址
         std::unordered_map<std::string, std::unordered_set<std::string>> _service_address_map;
@@ -70,6 +95,7 @@ namespace crpc {
 				}
             }
         }
+
 
         // 处理注册中心接收的协程
         asio::awaitable<void> _registry_session_recv(std::shared_ptr<registry_session> session) {
@@ -138,20 +164,63 @@ namespace crpc {
             _registry_disconnect_callback();
         }
 
+
+        // 创建新连接
+        std::shared_ptr<connection> _create_connection(const std::string& addr) {
+            auto con = std::make_shared<connection>();
+            con->client = std::make_shared<client>(_io_context);
+            con->addr = addr;
+            std::string host = addr.substr(0, addr.find(':'));
+            uint16_t port = std::stoi(addr.substr(addr.find(':') + 1));
+            con->client->connect_server(host, port);
+            con->update();
+            LOGGER.log_info("create new connection to {}", addr);
+            return con;
+        }
+
+        // 根据路由策略获取服务相关的连接
+        std::shared_ptr<connection> _find_connection(const std::string& name) {
+            if (_service_address_map[name].empty())
+                throw service_not_available_error("service " + name + " not found");
+
+            std::string addr = _route_strategy->get_route_address(_local_address, name, _service_address_map[name]);
+                
+            if (_pool.contains(addr)) {
+                return _pool[addr];
+            }
+            else {
+                auto con = _create_connection(addr);
+                if(_pool.size() == _pool_size) {
+                    // LRU 删除最久未使用的连接
+                    auto it = _lru_queue.begin();
+                    _pool.erase((*it)->addr);
+                    _lru_queue.erase(it);
+				}
+                _pool[addr] = con;
+                _lru_queue.insert(con);
+                return con;
+            }
+        }
+
     public:
-        connection_pool()
-            : _io_context(1), _work_guard(asio::make_work_guard(_io_context.get_executor())) {
-            _io_thread = std::jthread([&io_context = this->_io_context] {
+        connection_pool(size_t pool_size, const std::string& route_strategy = "polling")
+            : _io_context(std::make_shared<asio::io_context>(1))
+            , _work_guard(asio::make_work_guard(get_io_context().get_executor()))
+            , _pool_size(pool_size)
+            , _route_strategy(route::strategy_factory::create(route_strategy)) {
+
+            _io_thread = std::jthread([io_context = this->_io_context] {
                 LOGGER.log_debug("connection_pool io thread started");
-                io_context.run();
+                io_context->run();
                 LOGGER.log_debug("connection_pool io thread stopped");
             });
         }
 
         ~connection_pool() {
             if(_registry_session) _disconnect_registry(_registry_session);
+            _pool.clear();
             _work_guard.reset();
-            _io_context.stop();
+            get_io_context().stop();
             _io_thread.request_stop();
         }
 
@@ -160,7 +229,7 @@ namespace crpc {
 
         // 获取io_context
         asio::io_context& get_io_context() {
-            return _io_context;
+            return *_io_context;
         }
 
         // 设置是否在更新订阅时自动推送订阅到注册中心
@@ -168,14 +237,14 @@ namespace crpc {
             _auto_push_subscribe = flag;
         }
 
+
         // 连接注册中心
         void connect_registry(const std::string& host, uint16_t port) {
-            // 启动初始化协程 并阻塞等待
             try {
                 _registry_session = std::make_shared<registry_session>(registry_session{
-                    std::move(asio::ip::tcp::resolver(_io_context)),
-                    std::move(asio::ip::tcp::socket(_io_context)),
-                    std::move(asio::steady_timer(_io_context)),
+                    std::move(asio::ip::tcp::resolver(get_io_context())),
+                    std::move(asio::ip::tcp::socket(get_io_context())),
+                    std::move(asio::steady_timer(get_io_context())),
                     std::queue<proto::package>()
                 });
 
@@ -183,7 +252,9 @@ namespace crpc {
                 auto session = _registry_session;
                 auto endpoints = session->resolver.resolve(host, std::to_string(port));
                 session->socket.connect(*endpoints.begin());
-                LOGGER.log_info("connect to registry {}:{}", host, port);
+                auto local_endpoint = session->socket.local_endpoint();
+                _local_address = local_endpoint.address().to_string() + ":" + std::to_string(local_endpoint.port());
+                LOGGER.log_info("connect to registry {}:{}", host, port); 
 
                 // 发送初始化包
                 std::vector<std::pair<std::string, bool>> updates{};
@@ -199,14 +270,16 @@ namespace crpc {
                 if (response.type() != proto::request_type::RPC_CLIENT_ONLINE_RESPONSE) {
                     throw std::runtime_error("invalid response from registry");
                 }
+                auto services = serializer::instance().deserialize_service_update(response.data());
+                _service_address_map.clear();
+                _update_service(services);
                 LOGGER.log_debug("recv online response from registry");
 
                 _last_subscribes = _current_subscribes;
-                _service_address_map.clear();
 
                 // 生成会话
-                asio::co_spawn(_io_context, [self = shared_from_this()] { return self->_registry_session_recv(self->_registry_session); }, asio::detached);
-                asio::co_spawn(_io_context, [self = shared_from_this()] { return self->_registry_session_send(self->_registry_session); }, asio::detached);
+                asio::co_spawn(get_io_context(), [self = shared_from_this()] { return self->_registry_session_recv(self->_registry_session); }, asio::detached);
+                asio::co_spawn(get_io_context(), [self = shared_from_this()] { return self->_registry_session_send(self->_registry_session); }, asio::detached);
             }
             catch (const std::exception& e) {
                 _registry_session = nullptr;
@@ -218,6 +291,7 @@ namespace crpc {
         void set_registry_disconnect_callback(std::function<void()> callback) {
             _registry_disconnect_callback = callback;
 		}
+
 
         // 添加订阅
         std::shared_ptr<connection_pool> subscribe_service(const std::string& name) {
@@ -270,5 +344,21 @@ namespace crpc {
             LOGGER.log_info("push subscribe update");
             return shared_from_this();
 		}
+        
+
+        // 异步调用
+        template<class return_t, class ... args_t>
+        rpc_future<return_t> async_call(const std::string& name, args_t&&... args) {
+            auto con = _find_connection(name);
+            return con->client->async_call<return_t, args_t...>(name, std::forward<args_t>(args)...);
+        }
+
+        // 同步调用
+        template<class return_t, class ... args_t>
+        return_t call(const std::string& name, args_t&&... args) {
+			auto con = _find_connection(name);
+			return con->client->call<return_t, args_t...>(name, std::forward<args_t>(args)...);
+		}
+    
     };
 }

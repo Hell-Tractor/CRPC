@@ -8,5 +8,7 @@ int main() {
 
 	reg->start("127.0.0.1", 55554);
 
-	std::cin.get();
+	while (true) {
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+	}
 }

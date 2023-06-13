@@ -4,16 +4,23 @@
 #include <fstream>
 
 void connection_pool_test() {
-	LOGGER.add_stream(std::cout, utils::logger::level::debug);
+	// LOGGER.add_stream(std::cout, utils::logger::level::debug);
 
-	auto con = std::make_shared<crpc::connection_pool>();
+	auto con = std::make_shared<crpc::connection_pool>(10, "polling");
+
+	con->subscribe_service("add1")->subscribe_service("mul1")->subscribe_service("add2")->subscribe_service("mul2");
 	con->connect_registry("127.0.0.1", 55554);
 
-	con->subscribe_service("add")->subscribe_service("mul")->subscribe_service("size")->push_subscribe_update();
-
-	con->unsubscribe_service("add")->subscribe_service("add")->unsubscribe_service("mul")->push_subscribe_update();
-
-	con->subscribe_service("mul")->push_subscribe_update();
+	for (int i = 0; ; i++) {
+		try {
+			std::cout << con->call<std::string>("add1", 0, i) << std::endl;
+			std::cout << con->call<std::string>("mul1", 1, i) << std::endl;
+		}
+		catch (const std::exception& e) {
+			std::cerr << std::format("exception: {}", e.what()) << std::endl;
+		}
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	}
 }
 
 void client_test() {
@@ -57,7 +64,10 @@ int main() {
 		// client_test();
 	}
 	catch (const std::exception& e) {
-		LOGGER.log_error("main exception: {}", e.what());
+		std::cerr << std::format("main exception: {}", e.what()) << std::endl;
 	}
-	std::cin.get();
+
+	while (true) {
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+	}
 }
