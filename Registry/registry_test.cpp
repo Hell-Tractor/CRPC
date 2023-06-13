@@ -4,7 +4,7 @@
 int main() {
 	LOGGER.add_stream(std::cout, utils::logger::level::debug);
 
-	auto reg = std::make_shared<crpc::registry>();
+	auto reg = crpc::registry::create();
 
 	reg->start("127.0.0.1", 55554);
 

@@ -81,6 +81,20 @@ namespace crpc {
         std::unordered_map<std::string, std::unordered_set<std::string>> _service_address_map;
 
 
+        connection_pool(size_t pool_size, const std::string& route_strategy)
+            : _io_context(std::make_shared<asio::io_context>(1))
+            , _work_guard(asio::make_work_guard(get_io_context().get_executor()))
+            , _pool_size(pool_size)
+            , _route_strategy(route::strategy_factory::create(route_strategy)) {
+
+            _io_thread = std::jthread([io_context = this->_io_context] {
+                LOGGER.log_debug("connection_pool io thread started");
+                io_context->run();
+                LOGGER.log_debug("connection_pool io thread stopped");
+                });
+        }
+
+
         // 更新服务
         void _update_service(std::vector<std::tuple<std::string, std::string, bool>> updates) {
             for (auto& [name, addr, state] : updates) {
@@ -168,7 +182,7 @@ namespace crpc {
         // 创建新连接
         std::shared_ptr<connection> _create_connection(const std::string& addr) {
             auto con = std::make_shared<connection>();
-            con->client = std::make_shared<client>(_io_context);
+            con->client = client::create(_io_context);
             con->addr = addr;
             std::string host = addr.substr(0, addr.find(':'));
             uint16_t port = std::stoi(addr.substr(addr.find(':') + 1));
@@ -203,17 +217,9 @@ namespace crpc {
         }
 
     public:
-        connection_pool(size_t pool_size, const std::string& route_strategy = "polling")
-            : _io_context(std::make_shared<asio::io_context>(1))
-            , _work_guard(asio::make_work_guard(get_io_context().get_executor()))
-            , _pool_size(pool_size)
-            , _route_strategy(route::strategy_factory::create(route_strategy)) {
-
-            _io_thread = std::jthread([io_context = this->_io_context] {
-                LOGGER.log_debug("connection_pool io thread started");
-                io_context->run();
-                LOGGER.log_debug("connection_pool io thread stopped");
-            });
+        
+        static std::shared_ptr<connection_pool> create(size_t pool_size, const std::string& route_strategy = "polling") {
+            return std::shared_ptr<connection_pool>(new connection_pool(pool_size, route_strategy));
         }
 
         ~connection_pool() {

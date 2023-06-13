@@ -68,6 +68,15 @@ namespace crpc {
         bool _auto_push_service = DEFAULT_SERVER_AUTO_PUSH_SERVICE;
 
 
+        server(const std::string& host, uint16_t port)
+            : _host(host), _port(port), _io_context(1), _work_guard(asio::make_work_guard(_io_context.get_executor())) {
+            _io_thread = std::jthread([&io_context = this->_io_context] {
+                LOGGER.log_debug("server io thread started");
+                io_context.run();
+                LOGGER.log_debug("server io thread stopped");
+                });
+        }
+
         // ¼àÌýÐ­³Ì
         asio::awaitable<void> _listener()
         {
@@ -254,14 +263,10 @@ namespace crpc {
 		}
 
     public:
-        server(const std::string& host, uint16_t port) 
-            : _host(host), _port(port), _io_context(1), _work_guard(asio::make_work_guard(_io_context.get_executor())) {
-            _io_thread = std::jthread([&io_context = this->_io_context] {
-                LOGGER.log_debug("server io thread started");
-                io_context.run();
-                LOGGER.log_debug("server io thread stopped");
-            });
-        }
+        
+        static std::shared_ptr<server> create(const std::string& host, uint16_t port) {
+			return std::shared_ptr<server>(new server(host, port));
+		}
 
         ~server() { stop(); }
 

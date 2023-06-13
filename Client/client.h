@@ -43,6 +43,35 @@ namespace crpc {
         
         uint32_t _current_seq_id = 0;
 
+
+        client() :
+            _io_context(std::make_shared<asio::io_context>(1)),
+            _use_self_io_context(true),
+            _work_guard(asio::make_work_guard(get_io_context())),
+            _resolver(get_io_context()),
+            _socket(get_io_context()),
+            _timer(get_io_context()) {
+
+            _timer.expires_at(std::chrono::steady_clock::time_point::max());
+            _io_thread = std::make_unique<std::jthread>([this] {
+                LOGGER.log_debug("client io thread started");
+                get_io_context().run();
+                LOGGER.log_debug("client io thread stopped");
+                });
+        }
+
+        client(std::shared_ptr<asio::io_context> io_context) :
+            _io_context(io_context),
+            _use_self_io_context(false),
+            _work_guard(asio::make_work_guard(get_io_context())),
+            _resolver(get_io_context()),
+            _socket(get_io_context()),
+            _timer(get_io_context()) {
+
+            _timer.expires_at(std::chrono::steady_clock::time_point::max());
+        }
+
+
         // RPC调用超时时间
         std::chrono::milliseconds _rpc_call_timeout = DEFAULT_RPC_CALL_TIMEOUT;
 
@@ -109,35 +138,17 @@ namespace crpc {
             else {
                 // ignore
             }
-        }
+        } 
 
     public:
-        client() :
-            _io_context(std::make_shared<asio::io_context>(1)),
-            _use_self_io_context(true),
-            _work_guard(asio::make_work_guard(get_io_context())),
-            _resolver(get_io_context()),
-            _socket(get_io_context()),
-            _timer(get_io_context()) {
-
-            _timer.expires_at(std::chrono::steady_clock::time_point::max());
-            _io_thread = std::make_unique<std::jthread>([this] { 
-                LOGGER.log_debug("client io thread started");
-                get_io_context().run();
-                LOGGER.log_debug("client io thread stopped");
-            });
-        }
-
-        client(std::shared_ptr<asio::io_context> io_context) :
-			_io_context(io_context),
-            _use_self_io_context(false),
-			_work_guard(asio::make_work_guard(get_io_context())),
-			_resolver(get_io_context()),
-			_socket(get_io_context()),
-			_timer(get_io_context()) {
-
-			_timer.expires_at(std::chrono::steady_clock::time_point::max());
+       
+        static std::shared_ptr<client> create() {
+            return std::shared_ptr<client>(new client());
 		}
+
+        static std::shared_ptr<client> create(std::shared_ptr<asio::io_context> io_context) {
+            return std::shared_ptr<client>(new client(io_context));
+        }
 
         ~client() {
             if(_use_self_io_context) {

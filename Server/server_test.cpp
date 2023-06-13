@@ -23,7 +23,7 @@ int main(int argc, char* argv[]) {
 	std::cout << "input port: ";
 	std::cin >> port;
 
-	auto server = std::make_shared<crpc::server>("127.0.0.1", port);
+	auto server = crpc::server::create("127.0.0.1", port);
 
 	try {
 		server->register_service<std::string, int, int>("add1", [port](int a, int b) {

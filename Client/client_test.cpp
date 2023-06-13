@@ -6,7 +6,7 @@
 void connection_pool_test() {
 	// LOGGER.add_stream(std::cout, utils::logger::level::debug);
 
-	auto con = std::make_shared<crpc::connection_pool>(10, "polling");
+	auto con = crpc::connection_pool::create(10, "polling");
 
 	con->subscribe_service("add1")->subscribe_service("mul1")->subscribe_service("add2")->subscribe_service("mul2");
 	con->connect_registry("127.0.0.1", 55554);
@@ -26,7 +26,7 @@ void connection_pool_test() {
 void client_test() {
 	LOGGER.add_stream(std::cout, utils::logger::level::debug);
 
-	auto client = std::make_shared<crpc::client>();
+	auto client = crpc::client::create();
 	client->connect_server("127.0.0.1", 55555);
 
 	try {

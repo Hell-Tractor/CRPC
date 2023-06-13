@@ -72,6 +72,9 @@ namespace crpc {
 
         uint32_t _current_seq_id = 0;
 
+
+        registry() {}
+
         // ¼àÌıĞ­³Ì
         asio::awaitable<void> _listener()
         {
@@ -414,7 +417,11 @@ namespace crpc {
 
 
     public:
-        registry() {}
+        
+        static std::shared_ptr<registry> create() {
+            return std::shared_ptr<registry>(new registry());
+		}
+
         ~registry() { stop(); }
 
         registry(const registry&) = delete;
