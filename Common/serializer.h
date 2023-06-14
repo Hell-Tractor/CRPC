@@ -3,6 +3,7 @@
 #include <sstream>
 #include <string>
 #include <cereal/archives/json.hpp>
+#include <cereal/archives/binary.hpp>
 #include <cereal/types/map.hpp>
 #include <cereal/types/string.hpp>
 #include <cereal/types/tuple.hpp>
@@ -15,8 +16,8 @@
 
 namespace crpc {
     class serializer final : public utils::singleton<serializer> {
-        using input_archive = ::cereal::JSONInputArchive;
-        using output_archive = ::cereal::JSONOutputArchive;
+        using input_archive = ::cereal::BinaryInputArchive;
+        using output_archive = ::cereal::BinaryOutputArchive;
 
     public:
 
