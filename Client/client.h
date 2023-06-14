@@ -43,6 +43,7 @@ namespace crpc {
         
         uint32_t _current_seq_id = 0;
 
+        std::mutex _request_status_mutex;
 
         client() :
             _io_context(std::make_shared<asio::io_context>(1)),
@@ -208,8 +209,11 @@ namespace crpc {
                     LOGGER.log_error("rpc #{} timeout", seq_id);
                     promise.set_exception(std::make_exception_ptr(timeout_error("rpc timeout")));
 				}
-                timer->cancel();
-				self->_request_status.erase(seq_id);
+                {
+                    std::lock_guard<std::mutex> lock(self->_request_status_mutex);
+                    timer->cancel();
+                    self->_request_status.erase(seq_id);
+                }
 			}, asio::detached);
 
             return rpc_future<return_t>(_request_status[seq_id].promise.get_future());
@@ -224,8 +228,6 @@ namespace crpc {
 		// 关闭到服务器的连接
         void disconnet() {
 			_socket.close();
-            for (auto& [k, v] : _request_status) 
-                v.timer->cancel();
 		}
     };
 }

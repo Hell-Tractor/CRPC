@@ -118,7 +118,10 @@ namespace crpc {
                 if (_size > 0) {
 					_data = new uint8_t[_size];
                     asio::read(socket, asio::buffer(_data, _size), asio::transfer_exactly(_size));
-				}
+                }
+                else {
+                    _data = nullptr;
+                }
             }
 
             template<class callback_t>
@@ -148,7 +151,10 @@ namespace crpc {
                 if (_size > 0) {
 					_data = new uint8_t[_size];
 					co_await asio::async_read(socket, asio::buffer(_data, _size), asio::use_awaitable);
-				}
+                }
+                else {
+                    _data = nullptr;
+                }
 			}
 
             void write_to(asio::ip::tcp::socket& socket) const {
