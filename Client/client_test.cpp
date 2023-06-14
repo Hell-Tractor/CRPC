@@ -4,7 +4,7 @@
 #include <fstream>
 
 void connection_pool_test() {
-	// LOGGER.add_stream(std::cout, utils::logger::level::debug);
+	LOGGER.add_stream(std::cout, utils::logger::level::debug);
 
 	auto con = crpc::connection_pool::create(10, "polling");
 

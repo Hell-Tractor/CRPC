@@ -23,7 +23,7 @@ namespace crpc {
                 return_t ret;
                 std::apply([&](auto&&... unpacked_args) {
                     ret = _func(std::forward<args_t>(unpacked_args)...);
-                    }, args);
+                }, args);
                 return crpc::serializer::instance().serialize_rpc_response<return_t>(ret, {});
             }
             catch (std::exception& e) {
@@ -68,11 +68,11 @@ namespace crpc {
     public:
         return_t get() {
             auto serialized_ret = std::future<std::string>::get();
-            std::string error = crpc::serializer::instance().deserialize_rpc_response_error(serialized_ret);
+            auto [result, error] = crpc::serializer::instance().deserialize_rpc_response<return_t>(serialized_ret);
             if (!error.empty()) {
 				throw std::runtime_error(error);
 			}
-            return crpc::serializer::instance().deserialize_rpc_response_result<return_t>(serialized_ret);
+            return result;
         }
     };
 

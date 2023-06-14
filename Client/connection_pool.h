@@ -195,7 +195,7 @@ namespace crpc {
         // 根据路由策略获取服务相关的连接
         std::shared_ptr<connection> _find_connection(const std::string& name) {
             if (_service_address_map[name].empty())
-                throw service_not_available_error("service " + name + " not found");
+                throw service_not_available_error("no available service for " + name);
 
             std::string addr = _route_strategy->get_route_address(_local_address, name, _service_address_map[name]);
                 

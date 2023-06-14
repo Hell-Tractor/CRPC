@@ -118,11 +118,10 @@ namespace crpc {
 
                 try {
                     // 解析更新服务信息
-                    auto updates = serializer::instance().deserialize_server_online_service_list(fst_pack.data());
-                    auto addr = serializer::instance().deserialize_server_online_addr(fst_pack.data());
+                    auto [updates, addr] = serializer::instance().deserialize_server_online(fst_pack.data());
                     _servers[server->id]->addr_str = addr;
                     _update_provide(server, std::move(updates));
-                    LOGGER.log_debug("recv first service update from server#{}", server->id);
+                    LOGGER.log_debug("recv first service update from server#{}, addr:{}", server->id, addr);
                 }
                 catch (const std::exception& e) {
                     LOGGER.log_error("server#{} first service update failed: {}", server->id, e.what());

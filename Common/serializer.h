@@ -50,9 +50,9 @@ namespace crpc {
                 std::stringstream ss;
                 {
                     output_archive archive(ss);
-                    archive(::cereal::make_nvp("method", method), ::cereal::make_nvp("args", std::make_tuple(args...)));
+                    archive(std::make_tuple(args...));
                 }
-                return ss.str();
+                return method + '\n' + ss.str();
             }
             catch (const std::exception& e) {
                 throw serialize_error("failed when serializing rpc request");
@@ -62,11 +62,8 @@ namespace crpc {
         // 反序列化rpc请求的方法名
         std::string deserialize_rpc_request_method(const std::string& data) {
             try {
-                std::stringstream ss(data);
-                input_archive archive(ss);
-                std::string method;
-                archive(::cereal::make_nvp("method", method));
-                return method;
+                auto it = std::find(data.begin(), data.end(), '\n');
+                return std::string(data.begin(), it);
             }
             catch (const std::exception& e) {
                 throw deserialize_error("failed when deserializing method name of rpc request");
@@ -77,10 +74,11 @@ namespace crpc {
         template <typename... args_t>
         std::tuple<args_t...> deserialize_rpc_request_args(const std::string& data) {
             try {
-                std::stringstream ss(data);
+                auto it = std::find(data.begin(), data.end(), '\n');
+                std::stringstream ss(std::string(it + 1, data.end()));
                 input_archive archive(ss);
                 std::tuple<args_t...> args;
-                archive(::cereal::make_nvp("args", args));
+                archive(args);
                 return args;
             }
             catch (const std::exception& e) {
@@ -95,7 +93,7 @@ namespace crpc {
                 std::stringstream ss;
                 {
                     output_archive archive(ss);
-                    archive(::cereal::make_nvp("result", result), ::cereal::make_nvp("error", error));
+                    archive(result, error);
                 }
                 return ss.str();
             }
@@ -104,32 +102,19 @@ namespace crpc {
             }
         }
 
-        // 反序列化rpc响应的错误
-        std::string deserialize_rpc_response_error(const std::string& data) {
-            try {
-                std::stringstream ss(data);
-                input_archive archive(ss);
-                std::string error;
-                archive(::cereal::make_nvp("error", error));
-                return error;
-            }
-            catch (const std::exception& e) {
-                throw deserialize_error("failed when deserializing error of rpc response");
-            }
-        }
-
-        // 反序列化rpc响应的结果
+        // 反序列化rpc响应
         template <typename return_t>
-        return_t deserialize_rpc_response_result(const std::string& data) {
+        std::tuple<return_t, std::string> deserialize_rpc_response(const std::string& data) {
             try {
                 std::stringstream ss(data);
                 input_archive archive(ss);
                 return_t result;
-                archive(::cereal::make_nvp("result", result));
-                return result;
+                std::string error;
+                archive(result, error);
+                return std::tuple<return_t, std::string>(result, error);
             }
             catch (const std::exception& e) {
-                throw deserialize_error("failed when deserializing result of rpc response");
+                throw deserialize_error("failed when deserializing rpc response");
             }
         }
 
@@ -139,7 +124,7 @@ namespace crpc {
                 std::stringstream ss;
                 {
                     output_archive archive(ss);
-                    archive(::cereal::make_nvp("service_list", service_list), ::cereal::make_nvp("addr", addr));
+                    archive(service_list, addr);
                 }
                 return ss.str();
             }
@@ -148,31 +133,18 @@ namespace crpc {
             }
         }
 
-        // 反序列化服务器上线的服务列表
-        std::vector<std::pair<std::string, bool>> deserialize_server_online_service_list(const std::string& data) {
+        // 反序列化服务器上线
+        std::tuple<std::vector<std::pair<std::string, bool>>, std::string> deserialize_server_online(const std::string& data) {
 			try {
 				std::stringstream ss(data);
 				input_archive archive(ss);
 				std::vector<std::pair<std::string, bool>> service_list;
-				archive(::cereal::make_nvp("service_list", service_list));
-				return service_list;
+                std::string addr;
+				archive(service_list, addr);
+				return std::tuple<std::vector<std::pair<std::string, bool>>, std::string>(service_list, addr);
 			}
 			catch (const std::exception& e) {
-				throw deserialize_error("failed when deserializing service list of server online info");
-			}
-		}
-
-        // 反序列化服务器上线的地址
-        std::string deserialize_server_online_addr(const std::string& data) {
-			try {
-				std::stringstream ss(data);
-				input_archive archive(ss);
-				std::string addr;
-				archive(::cereal::make_nvp("addr", addr));
-				return addr;
-			}
-			catch (const std::exception& e) {
-				throw deserialize_error("failed when deserializing addr of server online info");
+				throw deserialize_error("failed when deserializing server online info");
 			}
 		}
 
@@ -182,7 +154,7 @@ namespace crpc {
 				std::stringstream ss;
                 {
 					output_archive archive(ss);
-					archive(::cereal::make_nvp("service_list", service_list));
+					archive(service_list);
 				}
 				return ss.str();
 			}
@@ -197,7 +169,7 @@ namespace crpc {
 				std::stringstream ss(data);
 				input_archive archive(ss);
 				std::vector<std::pair<std::string, bool>> service_list;
-				archive(::cereal::make_nvp("service_list", service_list));
+				archive(service_list);
 				return service_list;
 			}
             catch (const std::exception& e) {
@@ -211,7 +183,7 @@ namespace crpc {
                 std::stringstream ss;
                 {
                     output_archive archive(ss);
-                    archive(::cereal::make_nvp("subscribe_list", subscribe_list));
+                    archive(subscribe_list);
                 }
                 return ss.str();
             }
@@ -226,7 +198,7 @@ namespace crpc {
                 std::stringstream ss(data);
                 input_archive archive(ss);
                 std::vector<std::pair<std::string, bool>> subscribe_list;
-                archive(::cereal::make_nvp("subscribe_list", subscribe_list));
+                archive(subscribe_list);
                 return subscribe_list;
             }
             catch (const std::exception& e) {
@@ -235,12 +207,12 @@ namespace crpc {
         }
 
         // 序列化rpc服务更新（vector<tuple<服务名，地址，状态>>）
-        std::string serialize_service_update(std::vector<std::tuple<std::string, std::string, bool>> subscribe_list) {
+        std::string serialize_service_update(std::vector<std::tuple<std::string, std::string, bool>> service_list) {
             try {
                 std::stringstream ss;
                 {
                     output_archive archive(ss);
-                    archive(::cereal::make_nvp("service_list", subscribe_list));
+                    archive(service_list);
                 }
                 return ss.str();
             }
@@ -255,7 +227,7 @@ namespace crpc {
 				std::stringstream ss(data);
 				input_archive archive(ss);
 				std::vector<std::tuple<std::string, std::string, bool>> service_list;
-				archive(::cereal::make_nvp("service_list", service_list));
+				archive(service_list);
 				return service_list;
 			}
 			catch (const std::exception& e) {
